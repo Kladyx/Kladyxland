@@ -108,23 +108,20 @@
     body.edit-mode .text-edit-area{display:block!important;}
     body.edit-mode #intro-text{display:none;}
     body.edit-mode #hw-disclaimer-text{display:none;}
-    body.edit-mode #about-text{display:none;}
 
     /* LANGUAGE SWITCHER */
-    .lang-switch{display:flex;align-items:center;border:1px solid rgba(0,255,100,.4);border-radius:4px;overflow:hidden;margin-left:10px;flex-shrink:0;}
-    .lang-btn{background:transparent;border:none;color:rgba(0,255,100,.5);font-family:'Orbitron',monospace;font-size:.6rem;font-weight:700;letter-spacing:.08em;padding:5px 10px;cursor:pointer;transition:all .2s;}
-    .lang-btn.active{background:rgba(0,255,100,.2);color:#00ff66;}
-    .lang-btn:not(.active):hover{background:rgba(0,255,100,.08);}
-    .lang-sep{color:rgba(0,255,100,.2);font-size:.7rem;pointer-events:none;}
+    .lang-switch{display:flex;align-items:center;gap:2px;border:1px solid rgba(0,255,100,.35);border-radius:4px;overflow:hidden;margin-left:10px;flex-shrink:0;}
+    .lang-btn{background:transparent;border:none;color:rgba(0,255,100,.55);font-family:'Orbitron',monospace;font-size:.62rem;font-weight:700;letter-spacing:.08em;padding:5px 10px;cursor:pointer;transition:all .2s;}
+    .lang-btn.active{background:rgba(0,255,100,.18);color:#00ff66;}
+    .lang-btn:not(.active):hover{background:rgba(0,255,100,.08);color:rgba(0,255,100,.8);}
+    .lang-sep{color:rgba(0,255,100,.25);font-size:.7rem;pointer-events:none;padding:0 2px;}
 
-    /* ANNOUNCE + ABOUT ADMIN */
-    .admin-card{border-color:rgba(255,200,0,.35)!important;background:rgba(255,200,0,.04)!important;display:none;}
-    .admin-card h3{color:#ffcc00 !important;}
-    body.edit-mode .admin-card{display:block;}
-
+    /* ANNOUNCE ADMIN */
+    .ann-admin{border-color:rgba(255,200,0,.35)!important;background:rgba(255,200,0,.05)!important;}
+    .ann-admin h3{color:#ffcc00;}
     @media(max-width:600px){
       .lang-switch{margin-left:6px;}
-      .lang-btn{padding:4px 7px;font-size:.56rem;}
+      .lang-btn{padding:4px 7px;font-size:.58rem;}
     }
 
     /* PASSWORD MODAL */
@@ -219,10 +216,10 @@
     }
   </style>
 
-  <!-- Firebase: ON AIR + návštěvníci + texty + oznámení -->
+  <!-- Firebase: ON AIR + počítadlo návštěvníků + oznámení -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getDatabase, ref, set, get, onValue, push, remove, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+    import { getDatabase, ref, set, onValue, push, remove, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyDmAf2CZILbYKR72XYd3iCj3pQgnqFYTp8",
@@ -237,146 +234,102 @@
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // ── 1. POČÍTADLO NÁVŠTĚVNÍKŮ ─────────────────────────────────────────
-    // Každý tab dostane vlastní slot, při zavření se sám smaže
+    // ── POČÍTADLO NÁVŠTĚVNÍKŮ (presence) ─────────────────────────────────
     const visitorsRef = ref(db, 'visitors');
-    const mySlot = push(visitorsRef);
-    set(mySlot, { t: serverTimestamp() });
-    onDisconnect(mySlot).remove();
-    window.addEventListener('pagehide', () => { try { remove(mySlot); } catch(e){} });
+    const myRef = push(visitorsRef);
+    set(myRef, { joined: serverTimestamp() });
+    onDisconnect(myRef).remove();
+    window.addEventListener('beforeunload', () => remove(myRef));
     onValue(visitorsRef, snap => {
       const el = document.getElementById('vc');
       if (el) el.textContent = snap.exists() ? Object.keys(snap.val()).length : 1;
     });
 
-    // ── 2. ON AIR (jen přes vlastní tlačítko, NE přes Upravit) ──────────
+    // ── ON AIR stav ───────────────────────────────────────────────────────
     const liveRef = ref(db, 'onair/live');
-    window._isLive = false;
-
     function applyLiveState(state) {
-      window._isLive = state;
       const dot      = document.getElementById('onair-dot');
       const text     = document.getElementById('onair-text');
       const btn      = document.getElementById('broadcast-btn');
       const watchBtn = document.getElementById('live-watch-btn');
       const watchText= document.getElementById('live-btn-text');
       const watchDot = document.getElementById('live-btn-dot');
+      window._isLive = state;
       if (state) {
         dot.classList.add('live'); text.classList.add('live');
         text.textContent = 'ON AIR'; btn.classList.add('live');
         btn.textContent = '■ STOP BROADCAST';
         if (watchBtn)  { watchBtn.style.background='linear-gradient(135deg,#00aa44,#00ff66)'; watchBtn.style.boxShadow='0 0 25px rgba(0,255,100,.7)'; }
-        if (watchText) watchText.textContent = window._currentLang==='en' ? '▶ WATCH LIVE' : '▶ SLEDOVAT ŽIVĚ';
-        if (watchDot)  watchDot.style.background='#fff';
+        if (watchText) watchText.textContent = '▶ SLEDOVAT ŽIVĚ';
+        if (watchDot)  watchDot.style.background = '#fff';
       } else {
         dot.classList.remove('live'); text.classList.remove('live');
         text.textContent = 'OFFLINE'; btn.classList.remove('live');
         btn.textContent = '▶ START BROADCAST';
         if (watchBtn)  { watchBtn.style.background='linear-gradient(135deg,#cc0000,#ff2200)'; watchBtn.style.boxShadow='0 0 22px rgba(255,0,0,.6)'; }
         if (watchText) watchText.textContent = '● OFFLINE';
-        if (watchDot)  watchDot.style.background='#fff';
+        if (watchDot)  watchDot.style.background = '#fff';
       }
     }
-    onValue(liveRef, snap => applyLiveState(snap.val()===true));
-
-    // ON AIR toggle — pouze pro broadcast tlačítko
-    window.firebaseSetLive = state => set(liveRef, state).catch(e=>console.error(e));
-    window.toggleBroadcast = () => window.firebaseSetLive(!window._isLive);
-
-    // ── 3. EDITOVATELNÉ TEXTY VE FIREBASE (viditelné všem) ───────────────
-    const textsRef = ref(db, 'texts');
-
-    // Načíst texty z Firebase při startu
-    onValue(textsRef, snap => {
-      if (!snap.exists()) return;
-      const d = snap.val();
-      if (d.intro) {
-        const el = document.getElementById('intro-text');
-        if (el) el.innerHTML = d.intro;
-      }
-      if (d.hwDisclaimer) {
-        const el = document.getElementById('hw-disclaimer-text');
-        if (el) el.innerHTML = d.hwDisclaimer;
-      }
-      if (d.about) {
-        const el = document.getElementById('about-text');
-        if (el) el.innerHTML = d.about;
-      }
-    });
-
-    // Uložit intro do Firebase
-    window.fbSaveIntro = function() {
-      const val = document.getElementById('intro-edit').value.trim();
-      if (!val) return;
-      document.getElementById('intro-text').innerHTML = val;
-      set(ref(db,'texts/intro'), val);
-    };
-    // Uložit HW disclaimer do Firebase
-    window.fbSaveHwDisclaimer = function() {
-      const val = document.getElementById('hw-disclaimer-edit').value.trim();
-      if (!val) return;
-      document.getElementById('hw-disclaimer-text').innerHTML = val;
-      set(ref(db,'texts/hwDisclaimer'), val);
-    };
-    // Uložit About text do Firebase
-    window.fbSaveAbout = function() {
-      const val = document.getElementById('about-edit').value.trim();
-      if (!val) return;
-      document.getElementById('about-text').innerHTML = val;
-      set(ref(db,'texts/about'), val);
+    onValue(liveRef, snap => applyLiveState(snap.val() === true));
+    window.firebaseSetLive = state => set(liveRef, state).catch(e => console.error(e));
+    window._isLive = false;
+    window.toggleBroadcast = function() {
+      if (typeof window.firebaseSetLive === 'function') window.firebaseSetLive(!window._isLive);
     };
 
-    // ── 4. OZNÁMENÍ ───────────────────────────────────────────────────────
+    // ── OZNÁMENÍ ──────────────────────────────────────────────────────────
     const annRef = ref(db, 'announcements');
     const annColors = {
-      info: { border:'rgba(0,200,255,.4)',  bg:'rgba(0,200,255,.06)',  icon:'ℹ️' },
-      live: { border:'rgba(255,50,50,.5)',  bg:'rgba(255,50,50,.06)',  icon:'🔴' },
-      warn: { border:'rgba(255,180,0,.45)', bg:'rgba(255,180,0,.06)', icon:'⚠️' },
+      info: { border:'rgba(0,200,255,.4)',  bg:'rgba(0,200,255,.07)',  icon:'ℹ️' },
+      live: { border:'rgba(255,50,50,.5)',  bg:'rgba(255,50,50,.07)',  icon:'🔴' },
+      warn: { border:'rgba(255,180,0,.45)', bg:'rgba(255,180,0,.07)', icon:'⚠️' },
     };
 
-    onValue(annRef, snap => {
+    function renderAnnouncements(snap) {
       const wrap = document.getElementById('announcements-wrap');
       if (!wrap) return;
       wrap.innerHTML = '';
       if (!snap.exists()) return;
       Object.entries(snap.val())
-        .sort((a,b)=>(b[1].ts||0)-(a[1].ts||0))
-        .forEach(([key,item]) => {
-          const c = annColors[item.type] || annColors.info;
+        .sort((a,b) => (b[1].ts||0)-(a[1].ts||0))
+        .forEach(([key, item]) => {
+          const c    = annColors[item.type] || annColors.info;
           const date = item.ts ? new Date(item.ts).toLocaleString('cs-CZ',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-          const div = document.createElement('div');
-          div.className='card ann-card';
-          div.style.cssText=`border-color:${c.border};background:${c.bg};position:relative;margin-bottom:12px;`;
-          div.innerHTML=`
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+          const div  = document.createElement('div');
+          div.className = 'card';
+          div.style.cssText = `border-color:${c.border};background:${c.bg};position:relative;margin-bottom:12px;`;
+          div.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
               <span>${c.icon}</span>
-              <strong style="font-size:.88rem;letter-spacing:.04em;">${item.title||''}</strong>
-              <span style="margin-left:auto;font-size:.68rem;color:rgba(150,200,255,.45);">${date}</span>
+              <strong style="font-size:.9rem;letter-spacing:.04em;">${item.title||''}</strong>
+              <span style="margin-left:auto;font-size:.7rem;color:rgba(150,200,255,.5);">${date}</span>
             </div>
-            <p style="font-size:.84rem;color:rgba(180,220,255,.85);margin:0;">${item.body||''}</p>
-            <button class="ann-del" data-key="${key}" onclick="window.deleteAnn('${key}')"
-              style="display:none;position:absolute;top:7px;right:7px;background:rgba(255,40,40,.15);border:1px solid rgba(255,60,60,.4);color:#ff7777;font-size:.6rem;padding:3px 7px;cursor:pointer;border-radius:2px;font-family:'Exo 2',sans-serif;">✕</button>`;
+            <p style="font-size:.85rem;color:rgba(180,220,255,.85);margin:0;">${item.body||''}</p>
+            <button class="ann-del admin-only" data-key="${key}"
+              style="display:none;position:absolute;top:8px;right:8px;background:rgba(255,50,50,.15);border:1px solid rgba(255,80,80,.4);color:#ff7777;font-size:.65rem;padding:3px 8px;cursor:pointer;border-radius:2px;font-family:'Exo 2',sans-serif;"
+              onclick="window.deleteAnnouncement('${key}')">✕ Smazat</button>`;
           wrap.appendChild(div);
         });
-      // Zobrazit mazací tlačítka pokud jsme v edit módu
       if (document.body.classList.contains('edit-mode'))
-        document.querySelectorAll('.ann-del').forEach(b=>b.style.display='block');
-    });
+        document.querySelectorAll('.ann-del').forEach(b => b.style.display='block');
+    }
+    onValue(annRef, renderAnnouncements);
 
-    window.publishAnn = function() {
+    window.publishAnnouncement = function() {
       const title = document.getElementById('ann-title').value.trim();
       const body  = document.getElementById('ann-body').value.trim();
       const type  = document.getElementById('ann-type').value;
       if (!title && !body) { alert('Zadej alespoň nadpis nebo text!'); return; }
-      push(annRef, {title,body,type,ts:Date.now()}).then(()=>{
-        document.getElementById('ann-title').value='';
-        document.getElementById('ann-body').value='';
-      }).catch(e=>alert('Chyba: '+e.message));
-    };
-    window.deleteAnn = key => {
-      if (confirm('Smazat oznámení?')) remove(ref(db,'announcements/'+key));
+      push(annRef, { title, body, type, ts: Date.now() }).then(() => {
+        document.getElementById('ann-title').value = '';
+        document.getElementById('ann-body').value  = '';
+      }).catch(e => alert('Chyba: ' + e.message));
     };
 
+    window.deleteAnnouncement = function(key) {
+      if (confirm('Smazat toto oznámení?')) remove(ref(db, 'announcements/' + key));
+    };
   </script>
 
 </head>
@@ -385,7 +338,7 @@
 <!-- PASSWORD MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
-    <div class="modal-title" id="modal-title">🔐 PŘÍSTUP PRO EDITACI</div>
+    <div class="modal-title">🔐 PŘÍSTUP PRO EDITACI</div>
     <input class="modal-input" type="password" id="pw-input" placeholder="Zadej heslo..." onkeydown="if(event.key==='Enter')checkPw()"/>
     <div class="modal-btns">
       <button class="modal-ok" onclick="checkPw()">✓ Potvrdit</button>
@@ -400,10 +353,9 @@
   <nav>
     <a href="#" class="logo" onclick="hideAll();return false;">⬡ KLADYXLAND</a>
     <div class="nav-links">
-      <a href="#" class="nbtn nbtn-back" id="nb-back" onclick="hideAll();return false;">⟵ Zpět</a>
+      <a href="#" class="nbtn nbtn-back" id="nav-back" onclick="hideAll();return false;">⟵ Zpět</a>
       <a href="#" class="nbtn on" id="nb-home"     onclick="show('home');return false;">Home</a>
       <a href="#" class="nbtn"    id="nb-hardware" onclick="show('hardware');return false;">Hardware</a>
-      <a href="#" class="nbtn"    id="nb-about"    onclick="show('about');return false;" data-cs="O vysílání" data-en="About">O vysílání</a>
     </div>
     <div class="lang-switch">
       <button class="lang-btn active" id="lang-cs" onclick="setLang('cs')">CS</button>
@@ -426,7 +378,7 @@
           <span class="onair-dot" id="onair-dot"></span>
           <span class="onair-text" id="onair-text">ON AIR</span>
         </div>
-        <button class="broadcast-toggle" id="broadcast-btn" onclick="openBroadcastModal()">▶ START BROADCAST</button>
+        <button class="broadcast-toggle" id="broadcast-btn" onclick="openModal('broadcast')">▶ START BROADCAST</button>
 
         <button class="broadcast-toggle edit-only" id="mic-btn" onclick="toggleMic()" style="margin-top:4px;display:none;background:rgba(0,100,255,.15);border-color:rgba(0,150,255,.5);color:#44aaff;">🎙 ANALYZÉR OFF</button>
         <div class="signal-status">
@@ -452,10 +404,10 @@
 
     <div class="control-bar">
       <div class="ctrl-nav">
-        <a href="#" class="cbtn" id="cb-back" onclick="hideAll();return false;">⟵ Zpět</a>
-        <a href="#" class="cbtn" id="cb-home" onclick="show('home');return false;">⌂ Home</a>
-        <a href="#" class="cbtn" id="cb-hw"   onclick="show('hardware');return false;">⚙ Hardware</a>
-        <a href="#" class="cbtn" id="cb-about" onclick="show('about');return false;">📻 O vysílání</a>
+        <a href="#" class="cbtn" onclick="hideAll();return false;">⟵ Zpět</a>
+        <a href="#" class="cbtn" onclick="show('home');return false;">⌂ Home</a>
+        <a href="#" class="cbtn" onclick="show('hardware');return false;">⚙ Hardware</a>
+
       </div>
       <div class="ctrl-right">
         <div class="visitor-box">
@@ -472,41 +424,40 @@
     <!-- HOME -->
     <div class="section on" id="s-home">
       <div class="content-wrap single">
-        <div class="stitle" id="stitle-home">TRANSMISSION ACTIVE
-          <button class="edit-btn" id="btn-edit-home" onclick="openModal('home')">✏️ Upravit</button>
-          <button class="edit-btn" id="btn-ann" onclick="openModal('announce')" style="border-color:rgba(255,200,0,.5);color:#ffcc00;">📢 Oznámení</button>
+        <div class="stitle">TRANSMISSION ACTIVE
+          <button class="edit-btn" onclick="openModal('announce')">📢 Oznámení</button>
+          <button class="edit-btn" onclick="openModal('broadcast')">✏️ Upravit</button>
         </div>
 
-        <!-- Oznámení z Firebase -->
+        <!-- Zobrazení oznámení z Firebase -->
         <div id="announcements-wrap"></div>
 
-        <!-- Admin panel oznámení -->
-        <div class="card admin-card" id="announce-admin">
+        <!-- Admin panel: přidat oznámení (viditelný jen po přihlášení) -->
+        <div class="card ann-admin" id="announce-admin" style="display:none;">
           <h3>📢 Nové oznámení</h3>
-          <input id="ann-title" class="text-edit-area" style="height:38px;resize:none;margin-bottom:8px;" placeholder="Nadpis..."/>
+          <input id="ann-title" class="text-edit-area" style="height:38px;resize:none;margin-bottom:8px;" placeholder="Nadpis oznámení..."/>
           <textarea id="ann-body" class="text-edit-area" rows="3" placeholder="Text oznámení..."></textarea>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <select id="ann-type" style="background:rgba(0,10,40,.9);border:1px solid rgba(0,245,255,.3);color:#cce5ff;padding:8px;border-radius:3px;font-family:'Exo 2',sans-serif;font-size:.82rem;">
+            <select id="ann-type" style="background:rgba(0,10,40,.9);border:1px solid rgba(0,245,255,.3);color:#cce5ff;padding:8px 10px;border-radius:3px;font-family:'Exo 2',sans-serif;font-size:.82rem;">
               <option value="info">ℹ️ Info</option>
               <option value="live">🔴 Živě</option>
               <option value="warn">⚠️ Upozornění</option>
             </select>
-            <button class="btn-add-save" onclick="window.publishAnn()" style="flex:1;">📤 Publikovat</button>
+            <button class="btn-add-save" onclick="window.publishAnnouncement()" style="flex:1;min-width:120px;">📤 Publikovat</button>
           </div>
         </div>
-
         <div class="card">
-          <h3 id="h3-home">Broadcasting from the Dark Side of Sound</h3>
+          <h3>Broadcasting from the Dark Side of Sound</h3>
           <p id="intro-text">Vítej na KLADYXLANDU LIVE : DETECTED. Pouštím jakoukoliv hudbu a hity uplynulých let, ke kterým máme společné vzpomínky. Každé vysílání je návrat k trackům, které nás provázely v klubech, v rádiu i doma ve sluchátkách.</p>
           <textarea id="intro-edit" class="text-edit-area" style="display:none;" rows="4"></textarea>
-          <button class="btn-add-save text-save-btn" id="intro-save-btn" style="display:none;margin-top:8px;" onclick="window.fbSaveIntro()">✓ Uložit</button>
+          <button class="btn-add-save text-save-btn" id="intro-save-btn" style="display:none;margin-top:8px;" onclick="saveIntro()">✓ Uložit úvod</button>
         </div>
-        <div class="disclaimer col-full" id="disclaimer-home">
+        <div class="disclaimer col-full">
           ⚠️ <strong>Disclaimer:</strong> Tento projekt není spojen s žádnou firmou ani značkou. Veškerá technika je zakoupena z vlastních prostředků. Jde čistě o soukromý koníček a záliba k muzice, bez jakékoliv komerční vazby.
         </div>
         <div class="card">
-          <h3 id="h3-live">📡 Živé vysílání</h3>
-          <p id="live-desc" style="margin-bottom:14px;">Když vysíláme — připoj se přímo na Mixcloud:</p>
+          <h3>📡 Živé vysílání</h3>
+          <p style="margin-bottom:14px;">Když vysíláme — připoj se přímo na Mixcloud:</p>
           <a href="https://www.mixcloud.com/live/kladyx" target="_blank" id="live-watch-btn" style="
             display:inline-flex;align-items:center;gap:8px;
             font-family:'Orbitron',monospace;font-size:.7rem;font-weight:900;
@@ -514,32 +465,18 @@
             background:linear-gradient(135deg,#cc0000,#ff2200);
             padding:13px 24px;text-decoration:none;
             clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
-            box-shadow:0 0 22px rgba(255,0,0,.6);transition:all .4s ease;">
+            box-shadow:0 0 22px rgba(255,0,0,.6);
+            transition:all .4s ease;
+          ">
             <span id="live-btn-dot" style="width:9px;height:9px;border-radius:50%;background:#fff;box-shadow:0 0 6px #fff;animation:pulse 1.4s ease-in-out infinite;flex-shrink:0;display:inline-block;"></span>
             <span id="live-btn-text">● OFFLINE</span>
           </a>
         </div>
       </div>
     </div>
-
-    <!-- O MÉMM VYSÍLÁNÍ -->
-    <div class="section" id="s-about">
-      <div class="content-wrap single">
-        <div class="stitle" id="stitle-about">O MÉMM VYSÍLÁNÍ
-          <button class="edit-btn" id="btn-edit-about" onclick="openModal('about')">✏️ Upravit</button>
-        </div>
-        <div class="card">
-          <p id="about-text" style="white-space:pre-wrap;">Zde napiš cokoliv o svém vysílání — kdy vysíláš, jaký styl hudby, jaká je tvoje cesta k DJingu... Tento text můžeš kdykoliv změnit přímo z mobilu po přihlášení.</p>
-          <textarea id="about-edit" class="text-edit-area" style="display:none;" rows="8"></textarea>
-          <button class="btn-add-save text-save-btn" id="about-save-btn" style="display:none;margin-top:8px;" onclick="window.fbSaveAbout()">✓ Uložit</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- HARDWARE -->
     <div class="section" id="s-hardware">
       <div class="content-wrap single">
-        <div class="stitle" id="stitle-hw">
+        <div class="stitle">
           HARDWARE
           <button class="edit-btn" id="hw-edit-btn" onclick="openModal('hw')">✏️ Upravit</button>
         </div>
@@ -551,298 +488,337 @@
           • <strong>Reloop</strong> – analogový záznam a ovládání<br><br>
           Signál vedu přes kvalitní kabeláž značek <strong>Adam Hall (série 4), Klotz, Cordial, Hosa, Clicktronic a Landy</strong>, aby byl přenos co nejstabilnější a bez zbytečného šumu.</span>
           <textarea id="hw-disclaimer-edit" class="text-edit-area" style="display:none;" rows="6"></textarea>
-          <button class="btn-add-save text-save-btn" id="hw-disclaimer-save-btn" style="display:none;margin-top:8px;" onclick="window.fbSaveHwDisclaimer()">✓ Uložit text</button>
+          <button class="btn-add-save text-save-btn" id="hw-disclaimer-save-btn" style="display:none;margin-top:8px;" onclick="saveHwDisclaimer()">✓ Uložit text</button>
         </div>
+
       </div>
     </div>
 
+
+
   </div>
 
-  <footer id="footer-txt">© KLADYXLAND TRANSMISSION UNIT 01 &nbsp;·&nbsp; ČISTĚ NEZÁVISLÝ SOUKROMÝ PROJEKT &nbsp;·&nbsp; Artwork by Michal Kovalčík 2026</footer>
+  <footer>© KLADYXLAND TRANSMISSION UNIT 01 &nbsp;·&nbsp; ČISTĚ NEZÁVISLÝ SOUKROMÝ PROJEKT &nbsp;·&nbsp; Artwork by Michal Kovalčík 2026</footer>
 
 </div>
 
 <script>
-  // ── HESLA (SHA-256) ───────────────────────────────────────────────────────
-  // Heslo pro Upravit/About/HW: "Thefree8417"
-  // Heslo pro Oznámení:         "Thefree8417ann"  ← změň podle sebe
-  // Heslo pro Broadcast:        "Thefree8417bc"   ← změň podle sebe
-  async function hashPw(str){
-    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  }
-  const HASH = {};
-  (async()=>{
-    HASH.edit      = await hashPw("Thefree8417");
-    HASH.announce  = await hashPw("Thefree8417ann");
-    HASH.broadcast = await hashPw("Thefree8417bc");
-  })();
-
-  let pendingSection = null;
-
-  // Broadcast má vlastní modal s jiným heslem
-  function openBroadcastModal(){
-    pendingSection = 'broadcast';
-    document.getElementById('modal-title').textContent = '🔴 BROADCAST PŘÍSTUP';
-    document.getElementById('modal').classList.add('visible');
-    document.getElementById('pw-input').value='';
-    document.getElementById('pw-err').classList.remove('visible');
-    setTimeout(()=>document.getElementById('pw-input').focus(),100);
-  }
+  // PASSWORD
+  async function hashPw(str){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+  let _pwHash=null;
+  (async()=>{_pwHash=await hashPw("Thefree8417");})();
+  let pendingSection=null;
 
   function openModal(section){
-    pendingSection = section;
-    if(section==='announce'){
-      document.getElementById('modal-title').textContent = '📢 PŘÍSTUP PRO OZNÁMENÍ';
-    } else {
-      document.getElementById('modal-title').textContent = '🔐 PŘÍSTUP PRO EDITACI';
-    }
-    document.getElementById('modal').classList.add('visible');
-    document.getElementById('pw-input').value='';
-    document.getElementById('pw-err').classList.remove('visible');
-    setTimeout(()=>document.getElementById('pw-input').focus(),100);
+    pendingSection=section;document.getElementById('modal').classList.add('visible');document.getElementById('pw-input').value='';document.getElementById('pw-err').classList.remove('visible');setTimeout(()=>document.getElementById('pw-input').focus(),100);
   }
   function closeModal(){
-    document.getElementById('modal').classList.remove('visible');
-    pendingSection=null;
+    document.getElementById('modal').classList.remove('visible');pendingSection=null;
   }
   async function checkPw(){
-    const val = document.getElementById('pw-input').value;
-    const h   = await hashPw(val);
-    let ok = false;
-    if(pendingSection==='broadcast') ok = (h===HASH.broadcast);
-    else if(pendingSection==='announce') ok = (h===HASH.announce);
-    else ok = (h===HASH.edit);
-
-    if(ok){
-      const sec = pendingSection;
+    const val=document.getElementById('pw-input').value;
+    const h=await hashPw(val);
+    if(h===_pwHash){
+      const section = pendingSection;
       closeModal();
-      enableEdit(sec);
-    } else {
-      document.getElementById('pw-err').classList.add('visible');
-      document.getElementById('pw-input').value='';
-      document.getElementById('pw-input').focus();
+      enableEdit(section);
+    }else{
+      document.getElementById('pw-err').classList.add('visible');document.getElementById('pw-input').value='';document.getElementById('pw-input').focus();
     }
   }
 
   function enableEdit(section){
-    if(section==='broadcast'){
-      // POUZE spustí/zastaví vysílání, nic jiného
-      if(typeof window.toggleBroadcast==='function') window.toggleBroadcast();
-      return;
-    }
-    // Pro vše ostatní aktivuj edit mód
     document.body.classList.add('edit-mode');
-    const micBtn=document.getElementById('mic-btn');
-    if(micBtn) micBtn.style.display='block';
-    populateTextEdits();
-    // Zobrazit mazací tlačítka u oznámení
+    const micBtn=document.getElementById('mic-btn');if(micBtn)micBtn.style.display='block';
+    // Zobrazit admin panel pro oznámení + tlačítka smazat
+    const annAdmin=document.getElementById('announce-admin');if(annAdmin)annAdmin.style.display='block';
     document.querySelectorAll('.ann-del').forEach(b=>b.style.display='block');
-    // Zobrazit admin panel oznámení jen pro sekci announce
+    populateTextEdits();
+    if(section==='hw'){const btn=document.getElementById('hw-edit-btn');btn.textContent='🔒 Konec úprav';btn.classList.add('active');btn.onclick=disableEdit;loadHw();}
+    if(section==='broadcast'){toggleBroadcast();}
     if(section==='announce'){
-      const aa=document.getElementById('announce-admin');
-      if(aa){ aa.style.display='block'; setTimeout(()=>aa.scrollIntoView({behavior:'smooth',block:'center'}),200); }
-    }
-    if(section==='hw'){
-      const btn=document.getElementById('hw-edit-btn');
-      btn.textContent='🔒 Konec úprav'; btn.classList.add('active'); btn.onclick=disableEdit; loadHw();
-    }
-    if(section==='about'){
-      const btn=document.getElementById('btn-edit-about');
-      btn.textContent='🔒 Konec úprav'; btn.classList.add('active'); btn.onclick=disableEdit;
-    }
-    if(section==='home'){
-      const btn=document.getElementById('btn-edit-home');
-      btn.textContent='🔒 Konec úprav'; btn.classList.add('active'); btn.onclick=disableEdit;
+      const el=document.getElementById('announce-admin');
+      if(el){setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),100);}
     }
   }
-
   function disableEdit(){
     document.body.classList.remove('edit-mode');
-    const micBtn=document.getElementById('mic-btn'); if(micBtn) micBtn.style.display='none';
+    const micBtn=document.getElementById('mic-btn');if(micBtn)micBtn.style.display='none';
+    const annAdmin=document.getElementById('announce-admin');if(annAdmin)annAdmin.style.display='none';
     document.querySelectorAll('.ann-del').forEach(b=>b.style.display='none');
-    const aa=document.getElementById('announce-admin'); if(aa) aa.style.display='none';
-    // Reset all edit buttons
-    const hwBtn=document.getElementById('hw-edit-btn');
-    hwBtn.textContent='✏️ Upravit'; hwBtn.classList.remove('active'); hwBtn.onclick=()=>openModal('hw');
-    const abBtn=document.getElementById('btn-edit-about');
-    abBtn.textContent='✏️ Upravit'; abBtn.classList.remove('active'); abBtn.onclick=()=>openModal('about');
-    const hmBtn=document.getElementById('btn-edit-home');
-    hmBtn.textContent='✏️ Upravit'; hmBtn.classList.remove('active'); hmBtn.onclick=()=>openModal('home');
-    renumber();
+    const hwBtn=document.getElementById('hw-edit-btn');hwBtn.textContent='✏️ Upravit';hwBtn.classList.remove('active');hwBtn.onclick=()=>openModal('hw');renumber();
   }
+
+
 
   localStorage.removeItem('kladyx_hw');
 
-  // EDITABLE TEXTS - populate from DOM into textareas
-  function populateTextEdits(){
-    const it=document.getElementById('intro-text');
-    const ie=document.getElementById('intro-edit');
-    if(it&&ie) ie.value=it.innerText;
-    const hd=document.getElementById('hw-disclaimer-text');
-    const he=document.getElementById('hw-disclaimer-edit');
-    if(hd&&he) he.value=hd.innerText;
-    const at=document.getElementById('about-text');
-    const ae=document.getElementById('about-edit');
-    if(at&&ae) ae.value=at.innerText;
+  // EDITABLE TEXTS
+  function loadTexts() {
+    const intro = localStorage.getItem('kladyx_intro');
+    if (intro) document.getElementById('intro-text').innerHTML = intro;
+    const hwd = localStorage.getItem('kladyx_hw_disclaimer');
+    if (hwd) document.getElementById('hw-disclaimer-text').innerHTML = hwd;
   }
-
+  function saveIntro() {
+    const val = document.getElementById('intro-edit').value;
+    document.getElementById('intro-text').innerHTML = val;
+    localStorage.setItem('kladyx_intro', val);
+  }
+  function saveHwDisclaimer() {
+    const val = document.getElementById('hw-disclaimer-edit').value;
+    document.getElementById('hw-disclaimer-text').innerHTML = val;
+    localStorage.setItem('kladyx_hw_disclaimer', val);
+  }
+  function populateTextEdits() {
+    document.getElementById('intro-edit').value = document.getElementById('intro-text').innerText;
+    document.getElementById('hw-disclaimer-edit').value = document.getElementById('hw-disclaimer-text').innerText;
+  }
+  loadTexts();
   function addRow(){const brand=document.getElementById('new-brand').value.trim();const name=document.getElementById('new-name').value.trim();const cat=document.getElementById('new-cat').value.trim();if(!brand||!name){alert('Zadej značku a model!');return;}const tbody=document.getElementById('hw-tbody');const num=tbody.rows.length+1;const tr=document.createElement('tr');tr.innerHTML='<td class="hw-num">'+String(num).padStart(2,'0')+'</td><td class="hw-brand-col" style="color:#aaddff;">'+brand+'</td><td class="hw-name-col">'+name+'</td><td class="hw-cat">'+cat+'</td><td class="hw-del"><button class="btn-del-row" onclick="delRow(this)">✕</button></td>';tbody.appendChild(tr);document.getElementById('new-brand').value='';document.getElementById('new-name').value='';document.getElementById('new-cat').value='';renumber();saveHw();}
   function delRow(btn){btn.closest('tr').remove();renumber();saveHw();}
   function renumber(){const rows=document.getElementById('hw-tbody').rows;for(let i=0;i<rows.length;i++)rows[i].cells[0].textContent=String(i+1).padStart(2,'0');}
   function saveHw(){const rows=document.getElementById('hw-tbody').rows;const data=[];for(let r of rows)data.push({brand:r.cells[1].textContent,brandStyle:r.cells[1].getAttribute('style')||'',brandClass:r.cells[1].className,name:r.cells[2].textContent,cat:r.cells[3].textContent});localStorage.setItem('kladyx_hw',JSON.stringify(data));}
   function loadHw(){const saved=localStorage.getItem('kladyx_hw');if(!saved)return;try{const data=JSON.parse(saved);const tbody=document.getElementById('hw-tbody');tbody.innerHTML='';data.forEach((item,i)=>{const tr=document.createElement('tr');tr.innerHTML='<td class="hw-num">'+String(i+1).padStart(2,'0')+'</td><td class="'+item.brandClass+'" style="'+item.brandStyle+'">'+item.brand+'</td><td class="hw-name-col">'+item.name+'</td><td class="hw-cat">'+item.cat+'</td><td class="hw-del"><button class="btn-del-row" onclick="delRow(this)">✕</button></td>';tbody.appendChild(tr);});}catch(e){}}
 
-  // ── DIGI HODINY (lang-aware, stable) ─────────────────────────────────────
-  const CLOCK_DAYS = {
-    cs:['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'],
-    en:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-  };
-  const CLOCK_MONTHS = {
-    cs:['Ledna','Února','Března','Dubna','Května','Června','Července','Srpna','Září','Října','Listopadu','Prosince'],
-    en:['January','February','March','April','May','June','July','August','September','October','November','December']
-  };
-  function updateClock(){
-    const now=new Date();
-    const h=String(now.getHours()).padStart(2,'0');
-    const m=String(now.getMinutes()).padStart(2,'0');
-    const s=String(now.getSeconds()).padStart(2,'0');
-    document.getElementById('digi-time').innerHTML=h+'<span class="digi-colon">:</span>'+m+'<span class="digi-colon">:</span>'+s;
-    const lang=window._currentLang||'cs';
-    const days=CLOCK_DAYS[lang];
-    const months=CLOCK_MONTHS[lang];
-    document.getElementById('digi-date').textContent=days[now.getDay()]+' · '+now.getDate()+'. '+months[now.getMonth()]+' '+now.getFullYear();
+
+  // DIGI HODINY (lang-aware)
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('digi-time').innerHTML =
+      h+'<span class="digi-colon">:</span>'+m+'<span class="digi-colon">:</span>'+s;
+    const days   = window._langDays   || ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
+    const months = window._langMonths || ['Ledna','Února','Března','Dubna','Května','Června','Července','Srpna','Září','Října','Listopadu','Prosince'];
+    document.getElementById('digi-date').textContent =
+      days[now.getDay()]+' · '+now.getDate()+'. '+months[now.getMonth()]+' '+now.getFullYear();
   }
   updateClock();
   setInterval(updateClock,1000);
 
-  // VU METER + FREQ
-  let vuL=Array(10).fill(4),vuR=Array(10).fill(4),freqH=Array(15).fill(4);
-  function animateVU(){['vu-l','vu-r'].forEach((id,ch)=>{const arr=ch===0?vuL:vuR;const bars=document.querySelectorAll('#'+id+' span');bars.forEach((b,i)=>{const target=Math.floor(Math.random()*28+4);arr[i]=arr[i]*0.6+target*0.4;b.style.height=Math.floor(arr[i])+'px';});});}
-  let audioCtx,analyser,dataArray,realAnimId,micStream;
-  let usingRealAudio=false;
-  async function toggleMic(){const btn=document.getElementById('mic-btn');if(usingRealAudio){usingRealAudio=false;if(realAnimId){cancelAnimationFrame(realAnimId);realAnimId=null;}if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}if(audioCtx){audioCtx.close();audioCtx=null;analyser=null;}btn.textContent='🎙 ANALYZÉR OFF';btn.style.background='rgba(0,100,255,.15)';btn.style.borderColor='rgba(0,150,255,.5)';btn.style.color='#44aaff';}else{try{micStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(micStream);analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.75;dataArray=new Uint8Array(analyser.frequencyBinCount);source.connect(analyser);usingRealAudio=true;renderRealBars();btn.textContent='🎙 ANALYZÉR ON';btn.style.background='rgba(0,255,100,.15)';btn.style.borderColor='rgba(0,255,100,.5)';btn.style.color='#00ff66';}catch(e){alert('Přístup k mikrofonu zamítnut.');}}}
-  function renderRealBars(){if(!analyser||!usingRealAudio)return;analyser.getByteFrequencyData(dataArray);const bars=document.querySelectorAll('#freq-bars span');const NUM_BARS=bars.length;const chunkSize=Math.floor(dataArray.length/NUM_BARS);bars.forEach((b,i)=>{let sum=0;for(let j=i*chunkSize;j<i*chunkSize+chunkSize;j++)sum+=dataArray[j];const avg=sum/chunkSize||0;const h=Math.max(2,(avg/255)*34);b.style.height=Math.floor(h)+'px';});realAnimId=requestAnimationFrame(renderRealBars);}
-  function animateFreq(){if(usingRealAudio)return;const bars=document.querySelectorAll('#freq-bars span');bars.forEach((b,i)=>{const curve=Math.sin((i/bars.length)*Math.PI);const target=curve*(Math.random()*20+8)+4;freqH[i]=freqH[i]*0.55+target*0.45;b.style.height=Math.floor(freqH[i])+'px';});}
+  // VU METER + FREQ - realistické pomalé blikání
+  let vuL = Array(10).fill(4);
+  let vuR = Array(10).fill(4);
+  let freqH = Array(15).fill(4);
+
+  function animateVU() {
+    ['vu-l','vu-r'].forEach((id, ch) => {
+      const arr = ch === 0 ? vuL : vuR;
+      const bars = document.querySelectorAll('#' + id + ' span');
+      // Pomalý náhodný cíl pro každý bar
+      bars.forEach((b, i) => {
+        const target = Math.floor(Math.random() * 28 + 4);
+        // Plynulý přechod - bar se pohybuje pomalu ke cíli
+        arr[i] = arr[i] * 0.6 + target * 0.4;
+        b.style.height = Math.floor(arr[i]) + 'px';
+      });
+    });
+  }
+
+  // --- REAL AUDIO ANALYZER (getUserMedia) ---
+  let audioCtx, analyser, dataArray, realAnimId, micStream;
+  let usingRealAudio = false;
+
+  async function toggleMic() {
+    const btn = document.getElementById('mic-btn');
+    if (usingRealAudio) {
+      // Vypnout
+      usingRealAudio = false;
+      if (realAnimId) { cancelAnimationFrame(realAnimId); realAnimId = null; }
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
+      btn.textContent = '🎙 ANALYZÉR OFF';
+      btn.style.background = 'rgba(0,100,255,.15)';
+      btn.style.borderColor = 'rgba(0,150,255,.5)';
+      btn.style.color = '#44aaff';
+    } else {
+      // Zapnout
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.75;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+        usingRealAudio = true;
+        renderRealBars();
+        btn.textContent = '🎙 ANALYZÉR ON';
+        btn.style.background = 'rgba(0,255,100,.15)';
+        btn.style.borderColor = 'rgba(0,255,100,.5)';
+        btn.style.color = '#00ff66';
+      } catch(e) {
+        alert('Přístup k mikrofonu/audio zamítnut. Povol přístup v prohlížeči.');
+      }
+    }
+  }
+
+  function renderRealBars() {
+    if (!analyser || !usingRealAudio) return;
+    analyser.getByteFrequencyData(dataArray);
+    const bars = document.querySelectorAll('#freq-bars span');
+    const NUM_BARS = bars.length;
+    const chunkSize = Math.floor(dataArray.length / NUM_BARS);
+    bars.forEach((b, i) => {
+      let sum = 0;
+      for (let j = i * chunkSize; j < i * chunkSize + chunkSize; j++) sum += dataArray[j];
+      const avg = sum / chunkSize || 0;
+      const h = Math.max(2, (avg / 255) * 34);
+      b.style.height = Math.floor(h) + 'px';
+    });
+    realAnimId = requestAnimationFrame(renderRealBars);
+  }
+
+  function animateFreq() {
+    if (usingRealAudio) return;
+    const bars = document.querySelectorAll('#freq-bars span');
+    bars.forEach((b, i) => {
+      const curve = Math.sin((i / bars.length) * Math.PI);
+      const target = curve * (Math.random() * 20 + 8) + 4;
+      freqH[i] = freqH[i] * 0.55 + target * 0.45;
+      b.style.height = Math.floor(freqH[i]) + 'px';
+    });
+  }
+
   const signals=['SIGNAL LOCKED','AUDIO ACTIVE','TRANSMITTING','DARK SIDE OF SOUND','FREQUENCY OK'];
   let sigIdx=0;
   function cycleSignal(){sigIdx=(sigIdx+1)%signals.length;const el=document.getElementById('signal-text');if(el){el.style.opacity=0;setTimeout(()=>{el.textContent=signals[sigIdx];el.style.opacity=1;},300);}}
-  setInterval(animateVU,180);setInterval(animateFreq,200);setInterval(cycleSignal,4000);
+
+  setInterval(animateVU, 180);
+  setInterval(animateFreq, 200);
+  setInterval(cycleSignal, 4000);
 
   // NAVIGATION
   function hideAll(){document.querySelectorAll(".section").forEach(s=>s.classList.remove("on"));document.querySelectorAll(".nbtn").forEach(b=>b.classList.remove("on"));disableEdit();window.scrollTo({top:0,behavior:"smooth"});}
   function show(name){document.querySelectorAll(".section").forEach(s=>s.classList.remove("on"));document.querySelectorAll(".nbtn").forEach(b=>b.classList.remove("on"));document.getElementById("s-"+name).classList.add("on");const nb=document.getElementById("nb-"+name);if(nb)nb.classList.add("on");document.querySelector(".sections").scrollIntoView({behavior:"smooth"});}
 
-  // ── PŘEPÍNAČ JAZYKA CS/EN (stabilní, kompletní) ──────────────────────────
-  window._currentLang = localStorage.getItem('kladyx_lang') || 'cs';
-
-  const TR = {
-    cs: {
-      back:'⟵ Zpět', home:'Home', hw:'Hardware', about:'O vysílání',
-      cbBack:'⟵ Zpět', cbHome:'⌂ Home', cbHw:'⚙ Hardware', cbAbout:'📻 O vysílání',
+  // ── PŘEPÍNAČ CS / EN ─────────────────────────────────────────────────────
+  const T = {
+    cs:{
+      navBack:'⟵ Zpět', navHome:'Home', navHw:'Hardware',
+      modalTitle:'🔐 PŘÍSTUP PRO EDITACI', modalPh:'Zadej heslo...', modalOk:'✓ Potvrdit', modalCancel:'✕ Zrušit', modalErr:'❌ Špatné heslo',
+      cbBack:'⟵ Zpět', cbHome:'⌂ Home', cbHw:'⚙ Hardware',
       online:'Online',
-      modalEdit:'🔐 PŘÍSTUP PRO EDITACI', modalAnn:'📢 PŘÍSTUP PRO OZNÁMENÍ', modalBc:'🔴 BROADCAST PŘÍSTUP',
-      modalPh:'Zadej heslo...', modalOk:'✓ Potvrdit', modalCancel:'✕ Zrušit', modalErr:'❌ Špatné heslo',
-      stHome:'TRANSMISSION ACTIVE', editBtn:'✏️ Upravit', annBtn:'📢 Oznámení',
+      stHome:'TRANSMISSION ACTIVE', editAnn:'📢 Oznámení', editBtn:'✏️ Upravit',
       h3home:'Broadcasting from the Dark Side of Sound',
-      introDefault:'Vítej na KLADYXLANDU LIVE : DETECTED. Pouštím jakoukoliv hudbu a hity uplynulých let, ke kterým máme společné vzpomínky. Každé vysílání je návrat k trackům, které nás provázely v klubech, v rádiu i doma ve sluchátkách.',
-      introSave:'✓ Uložit',
+      introText:'Vítej na KLADYXLANDU LIVE : DETECTED. Pouštím jakoukoliv hudbu a hity uplynulých let, ke kterým máme společné vzpomínky. Každé vysílání je návrat k trackům, které nás provázely v klubech, v rádiu i doma ve sluchátkách.',
+      introSave:'✓ Uložit úvod',
       disclaimer:'⚠️ <strong>Disclaimer:</strong> Tento projekt není spojen s žádnou firmou ani značkou. Veškerá technika je zakoupena z vlastních prostředků. Jde čistě o soukromý koníček a záliba k muzice, bez jakékoliv komerční vazby.',
       h3live:'📡 Živé vysílání', liveDesc:'Když vysíláme — připoj se přímo na Mixcloud:',
       liveOff:'● OFFLINE', liveOn:'▶ SLEDOVAT ŽIVĚ',
-      stAbout:'O MÉMM VYSÍLÁNÍ', aboutEdit:'✏️ Upravit', aboutSave:'✓ Uložit',
-      stHw:'HARDWARE', hwEdit:'✏️ Upravit', hwSave:'✓ Uložit text',
+      stHw:'HARDWARE', hwEdit:'✏️ Upravit',
+      hwText:'O zvukovou kvalitu se stará technika těchto značek:<br>• <strong>PreSonus / Fender</strong> – studiová kontrola a základní processing<br>• <strong>Pioneer DJ</strong> – spolehlivý standard pro DJ mix a přehrávání<br>• <strong>RØDE</strong> – jistý přenos hlasu a mluveného slova<br>• <strong>Reloop</strong> – analogový záznam a ovládání<br><br>Signál vedu přes kvalitní kabeláž značek <strong>Adam Hall (série 4), Klotz, Cordial, Hosa, Clicktronic a Landy</strong>, aby byl přenos co nejstabilnější a bez zbytečného šumu.',
+      hwSave:'✓ Uložit text',
       footer:'© KLADYXLAND TRANSMISSION UNIT 01 &nbsp;·&nbsp; ČISTĚ NEZÁVISLÝ SOUKROMÝ PROJEKT &nbsp;·&nbsp; Artwork by Michal Kovalčík 2026',
-      annAdminTitle:'📢 Nové oznámení', annTitlePh:'Nadpis...', annBodyPh:'Text oznámení...', annPublish:'📤 Publikovat',
+      annTitle:'📢 Nové oznámení', annTitlePh:'Nadpis oznámení...', annBodyPh:'Text oznámení...', annPublish:'📤 Publikovat',
+      annDel:'✕ Smazat', annConfirm:'Smazat toto oznámení?',
+      micOff:'🎙 ANALYZÉR OFF', micOn:'🎙 ANALYZÉR ON',
+      bcastStart:'▶ START BROADCAST', bcastStop:'■ STOP BROADCAST',
+      days:['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'],
+      months:['Ledna','Února','Března','Dubna','Května','Června','Července','Srpna','Září','Října','Listopadu','Prosince'],
     },
-    en: {
-      back:'⟵ Back', home:'Home', hw:'Hardware', about:'About',
-      cbBack:'⟵ Back', cbHome:'⌂ Home', cbHw:'⚙ Hardware', cbAbout:'📻 About',
+    en:{
+      navBack:'⟵ Back', navHome:'Home', navHw:'Hardware',
+      modalTitle:'🔐 EDIT ACCESS', modalPh:'Enter password...', modalOk:'✓ Confirm', modalCancel:'✕ Cancel', modalErr:'❌ Wrong password',
+      cbBack:'⟵ Back', cbHome:'⌂ Home', cbHw:'⚙ Hardware',
       online:'Online',
-      modalEdit:'🔐 EDIT ACCESS', modalAnn:'📢 ANNOUNCEMENT ACCESS', modalBc:'🔴 BROADCAST ACCESS',
-      modalPh:'Enter password...', modalOk:'✓ Confirm', modalCancel:'✕ Cancel', modalErr:'❌ Wrong password',
-      stHome:'TRANSMISSION ACTIVE', editBtn:'✏️ Edit', annBtn:'📢 Announce',
+      stHome:'TRANSMISSION ACTIVE', editAnn:'📢 Announce', editBtn:'✏️ Edit',
       h3home:'Broadcasting from the Dark Side of Sound',
-      introDefault:'Welcome to KLADYXLAND LIVE : DETECTED. I play all kinds of music and hits from years gone by — tracks we share memories of. Every broadcast is a return to the music that accompanied us in clubs, on the radio and through headphones at home.',
-      introSave:'✓ Save',
+      introText:'Welcome to KLADYXLAND LIVE : DETECTED. I play all kinds of music and hits from years gone by — tracks we share memories of. Every broadcast is a return to the music that accompanied us in clubs, on the radio, and through our headphones at home.',
+      introSave:'✓ Save intro',
       disclaimer:'⚠️ <strong>Disclaimer:</strong> This project is not affiliated with any company or brand. All equipment is purchased with personal funds. It is purely a private hobby and passion for music, with no commercial ties whatsoever.',
       h3live:'📡 Live Stream', liveDesc:"When we're on air — join us directly on Mixcloud:",
       liveOff:'● OFFLINE', liveOn:'▶ WATCH LIVE',
-      stAbout:'ABOUT MY BROADCAST', aboutEdit:'✏️ Edit', aboutSave:'✓ Save',
-      stHw:'HARDWARE', hwEdit:'✏️ Edit', hwSave:'✓ Save text',
+      stHw:'HARDWARE', hwEdit:'✏️ Edit',
+      hwText:'Sound quality is ensured by equipment from these brands:<br>• <strong>PreSonus / Fender</strong> – studio control and core processing<br>• <strong>Pioneer DJ</strong> – reliable standard for DJ mixing and playback<br>• <strong>RØDE</strong> – dependable voice and speech transmission<br>• <strong>Reloop</strong> – analogue recording and control<br><br>Signal is carried through quality cabling from <strong>Adam Hall (Series 4), Klotz, Cordial, Hosa, Clicktronic and Landy</strong> for the most stable and noise-free transmission possible.',
+      hwSave:'✓ Save text',
       footer:'© KLADYXLAND TRANSMISSION UNIT 01 &nbsp;·&nbsp; FULLY INDEPENDENT PRIVATE PROJECT &nbsp;·&nbsp; Artwork by Michal Kovalčík 2026',
-      annAdminTitle:'📢 New Announcement', annTitlePh:'Title...', annBodyPh:'Announcement text...', annPublish:'📤 Publish',
+      annTitle:'📢 New Announcement', annTitlePh:'Announcement title...', annBodyPh:'Announcement text...', annPublish:'📤 Publish',
+      annDel:'✕ Delete', annConfirm:'Delete this announcement?',
+      micOff:'🎙 ANALYSER OFF', micOn:'🎙 ANALYSER ON',
+      bcastStart:'▶ START BROADCAST', bcastStop:'■ STOP BROADCAST',
+      days:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+      months:['January','February','March','April','May','June','July','August','September','October','November','December'],
     }
   };
 
-  function applyLang(lang){
-    window._currentLang = lang;
+  let currentLang = localStorage.getItem('kladyx_lang') || 'cs';
+
+  function setLang(lang) {
+    currentLang = lang;
     localStorage.setItem('kladyx_lang', lang);
-    document.documentElement.lang = lang;
     document.getElementById('lang-cs').classList.toggle('active', lang==='cs');
     document.getElementById('lang-en').classList.toggle('active', lang==='en');
-    const t = TR[lang];
-
-    // Nav links
-    const nbBack=document.getElementById('nb-back'); if(nbBack) nbBack.textContent=t.back;
-    const nbHome=document.getElementById('nb-home'); if(nbHome) nbHome.textContent=t.home;
-    const nbHw=document.getElementById('nb-hardware'); if(nbHw) nbHw.textContent=t.hw;
-    const nbAbout=document.getElementById('nb-about'); if(nbAbout) nbAbout.textContent=t.about;
-    // Control bar
-    const cbBack=document.getElementById('cb-back'); if(cbBack) cbBack.textContent=t.cbBack;
-    const cbHome=document.getElementById('cb-home'); if(cbHome) cbHome.textContent=t.cbHome;
-    const cbHw=document.getElementById('cb-hw');   if(cbHw)   cbHw.textContent=t.cbHw;
-    const cbAbout=document.getElementById('cb-about'); if(cbAbout) cbAbout.textContent=t.cbAbout;
+    document.documentElement.lang = lang;
+    const t = T[lang];
+    window._langDays   = t.days;
+    window._langMonths = t.months;
+    // Nav
+    const nb = document.getElementById('nav-back'); if(nb) nb.textContent = t.navBack;
+    const nh = document.getElementById('nb-home');  if(nh) nh.textContent = t.navHome;
+    const nw = document.getElementById('nb-hardware'); if(nw) nw.textContent = t.navHw;
+    // Modal
+    const mt = document.querySelector('.modal-title'); if(mt) mt.textContent = t.modalTitle;
+    const pi = document.getElementById('pw-input');   if(pi) pi.placeholder = t.modalPh;
+    const mo = document.querySelector('.modal-ok');   if(mo) mo.textContent = t.modalOk;
+    const mc = document.querySelector('.modal-cancel'); if(mc) mc.textContent = t.modalCancel;
+    const me = document.getElementById('pw-err');     if(me) me.textContent = t.modalErr;
+    // Ctrl bar
+    const cb = document.querySelectorAll('.ctrl-nav .cbtn');
+    if(cb[0]) cb[0].textContent = t.cbBack;
+    if(cb[1]) cb[1].textContent = t.cbHome;
+    if(cb[2]) cb[2].textContent = t.cbHw;
     // Online
-    const vl=document.querySelector('.vlabel'); if(vl) vl.textContent=t.online;
-    // Modal (jen pokud není otevřen)
-    const mi=document.getElementById('pw-input'); if(mi) mi.placeholder=t.modalPh;
-    const mo=document.querySelector('.modal-ok'); if(mo) mo.textContent=t.modalOk;
-    const mc=document.querySelector('.modal-cancel'); if(mc) mc.textContent=t.modalCancel;
-    const me=document.getElementById('pw-err'); if(me) me.textContent=t.modalErr;
+    const vl = document.querySelector('.vlabel'); if(vl) vl.textContent = t.online;
     // Home stitle
-    const sh=document.getElementById('stitle-home');
-    if(sh){ sh.childNodes[0].nodeValue=t.stHome+' '; }
-    const beh=document.getElementById('btn-edit-home'); if(beh&&!beh.classList.contains('active')) beh.textContent=t.editBtn;
-    const ban=document.getElementById('btn-ann'); if(ban) ban.textContent=t.annBtn;
-    // Home card
-    const h3h=document.getElementById('h3-home'); if(h3h) h3h.textContent=t.h3home;
-    const iSave=document.getElementById('intro-save-btn'); if(iSave) iSave.textContent=t.introSave;
-    // Disclaimer - pouze pokud Firebase nevrátil vlastní text
-    const dc=document.getElementById('disclaimer-home'); if(dc) dc.innerHTML=t.disclaimer;
-    // Live card
-    const h3l=document.getElementById('h3-live'); if(h3l) h3l.textContent=t.h3live;
-    const ld=document.getElementById('live-desc'); if(ld) ld.textContent=t.liveDesc;
-    const bt=document.getElementById('live-btn-text');
-    if(bt) bt.textContent=window._isLive ? t.liveOn : t.liveOff;
-    // About section
-    const sa=document.getElementById('stitle-about');
-    if(sa){ sa.childNodes[0].nodeValue=t.stAbout+' '; }
-    const bea=document.getElementById('btn-edit-about'); if(bea&&!bea.classList.contains('active')) bea.textContent=t.aboutEdit;
-    const aSave=document.getElementById('about-save-btn'); if(aSave) aSave.textContent=t.aboutSave;
-    // HW section
-    const shw=document.getElementById('stitle-hw');
-    if(shw){ shw.childNodes[0].nodeValue=t.stHw+' '; }
-    const hwBtn=document.getElementById('hw-edit-btn'); if(hwBtn&&!hwBtn.classList.contains('active')) hwBtn.textContent=t.hwEdit;
-    const hwSave=document.getElementById('hw-disclaimer-save-btn'); if(hwSave) hwSave.textContent=t.hwSave;
+    const sh = document.querySelector('#s-home .stitle');
+    if(sh) { sh.childNodes[0].textContent = t.stHome+' '; }
+    // Announce + edit btns in stitle
+    const eb = document.querySelectorAll('#s-home .stitle .edit-btn');
+    if(eb[0]) eb[0].textContent = t.editAnn;
+    if(eb[1]) eb[1].textContent = t.editBtn;
+    // Home h3
+    const h3 = document.querySelector('#s-home .card:first-of-type h3'); if(h3) h3.textContent = t.h3home;
+    // Intro text
+    const it = document.getElementById('intro-text');
+    if(it && !localStorage.getItem('kladyx_intro')) it.textContent = t.introText;
+    const is = document.getElementById('intro-save-btn'); if(is) is.textContent = t.introSave;
+    // Disclaimer
+    const dc = document.querySelector('#s-home .disclaimer.col-full'); if(dc) dc.innerHTML = t.disclaimer;
+    // Live
+    const hl = document.querySelector('#s-home .card:nth-of-type(2) h3'); if(hl) hl.textContent = t.h3live;
+    const ld = document.querySelector('#s-home .card:nth-of-type(2) p'); if(ld) ld.textContent = t.liveDesc;
+    const bt = document.getElementById('live-btn-text');
+    if(bt) bt.textContent = window._isLive ? t.liveOn : t.liveOff;
+    // HW
+    const sw = document.querySelector('#s-hardware .stitle');
+    if(sw) { sw.childNodes[0].textContent = t.stHw+' '; }
+    const he = document.getElementById('hw-edit-btn');
+    if(he && !he.classList.contains('active')) he.textContent = t.hwEdit;
+    const hd = document.getElementById('hw-disclaimer-text');
+    if(hd && !localStorage.getItem('kladyx_hw_disclaimer')) hd.innerHTML = t.hwText;
+    const hs = document.getElementById('hw-disclaimer-save-btn'); if(hs) hs.textContent = t.hwSave;
     // Footer
-    const ft=document.getElementById('footer-txt'); if(ft) ft.innerHTML=t.footer;
+    const ft = document.querySelector('footer'); if(ft) ft.innerHTML = t.footer;
     // Announce admin panel
-    const aat=document.querySelector('#announce-admin h3'); if(aat) aat.textContent=t.annAdminTitle;
-    const atp=document.getElementById('ann-title'); if(atp) atp.placeholder=t.annTitlePh;
-    const abp=document.getElementById('ann-body');  if(abp) abp.placeholder=t.annBodyPh;
-    const apb=document.querySelector('#announce-admin .btn-add-save'); if(apb) apb.textContent=t.annPublish;
-    // Broadcast btn text
-    const bc=document.getElementById('broadcast-btn');
-    if(bc) bc.textContent=window._isLive ? '■ STOP BROADCAST' : '▶ START BROADCAST';
-    // Update clock with new language
+    const aa = document.querySelector('.ann-admin h3'); if(aa) aa.textContent = t.annTitle;
+    const at = document.getElementById('ann-title'); if(at) at.placeholder = t.annTitlePh;
+    const ab = document.getElementById('ann-body');  if(ab) ab.placeholder = t.annBodyPh;
+    const ap = document.querySelector('#announce-admin .btn-add-save'); if(ap) ap.textContent = t.annPublish;
+    // Broadcast btn
+    const bc = document.getElementById('broadcast-btn');
+    if(bc) bc.textContent = window._isLive ? t.bcastStop : t.bcastStart;
+    // Mic btn
+    const mb = document.getElementById('mic-btn');
+    if(mb) mb.textContent = (typeof usingRealAudio !== 'undefined' && usingRealAudio) ? t.micOn : t.micOff;
     updateClock();
   }
 
-  function setLang(lang){ applyLang(lang); }
-
-  // Init jazyka
-  applyLang(window._currentLang);
+  // Init
+  setLang(currentLang);
 </script>
 </body>
 </html>
