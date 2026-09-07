@@ -2287,11 +2287,12 @@ I designed and wired everything myself without help from another person, just me
         <div id="hw-dyn-imgs" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px 0 8px;width:100%;box-sizing:border-box;"></div>
         <!-- Admin formulář - viditelný jen v edit-mode -->
         <div class="edit-only" style="display:none;margin-top:14px;padding:12px;background:rgba(0,245,255,.06);border-radius:8px;border:1px solid rgba(0,245,255,.15);">
-          <div style="font-size:.75rem;color:rgba(0,245,255,.7);margin-bottom:8px;" data-i18n="hw_add_img">🖼 Přidat obrázek (URL z Firebase Storage)</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <input id="hw-img-url" type="url" placeholder="https://firebasestorage.googleapis.com/..." style="flex:1;min-width:200px;padding:8px 10px;background:rgba(0,0,30,.5);border:1px solid rgba(0,245,255,.3);border-radius:6px;color:#e0f4ff;font-size:.8rem;"/>
-            <button onclick="addHwImage()" style="padding:8px 16px;background:rgba(0,245,255,.15);border:1px solid rgba(0,245,255,.4);border-radius:6px;color:#00f5ff;cursor:pointer;font-size:.8rem;" data-i18n="hw_add_btn">+ Přidat</button>
-          </div>
+          <div style="font-size:.75rem;color:rgba(0,245,255,.7);margin-bottom:8px;">🖼 Přidat obrázek hardwaru</div>
+          <label style="display:inline-block;padding:8px 16px;background:rgba(0,245,255,.15);border:1px solid rgba(0,245,255,.4);border-radius:6px;color:#00f5ff;cursor:pointer;font-size:.8rem;">
+            📁 Vyber obrázek
+            <input type="file" id="hw-img-file" accept="image/*" style="display:none;" onchange="uploadHwImage(this.files)"/>
+          </label>
+          <div id="hw-img-progress" style="margin-top:8px;height:4px;background:rgba(0,245,255,.1);border-radius:2px;overflow:hidden;display:none;"><div id="hw-img-bar" style="height:100%;background:#00f5ff;width:0%;transition:width .3s;"></div></div>
           <div id="hw-img-status" style="font-size:.72rem;margin-top:6px;color:rgba(0,245,255,.5);"></div>
         </div>
 
@@ -3013,7 +3014,8 @@ if (document.readyState === 'loading') {
     if (!data) return;
     const isAdmin = document.body.classList.contains('edit-mode');
     Object.keys(data).forEach(key => {
-      const url = data[key];
+      const entry = data[key];
+      const url = (typeof entry === 'object' && entry !== null) ? entry.url : entry;
       const div = document.createElement('div');
       div.style.cssText = 'position:relative;';
       const img = document.createElement('img');
@@ -3028,35 +3030,66 @@ if (document.readyState === 'loading') {
         btn.textContent = '✕';
         btn.title = 'Smazat obrázek';
         btn.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(200,0,0,.75);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.7rem;cursor:pointer;line-height:1;';
-        btn.onclick = function() { delHwImage(key); };
+        btn.onclick = function() { delHwImage(key, (typeof entry === 'object' && entry !== null) ? entry.path : null); };
         div.appendChild(btn);
       }
       wrap.appendChild(div);
     });
   }
-  function addHwImage() {
-    const inp = document.getElementById('hw-img-url');
+  function uploadHwImage(files) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
     const st = document.getElementById('hw-img-status');
-    const url = (inp ? inp.value : '').trim();
-    if (!url || !url.startsWith('http')) { if(st) st.textContent = '⚠ Zadej platnou URL'; return; }
-    if (!window.dbPush || !window.dbRef || !window.db) { if(st) st.textContent = curLang==='en'?'⚠ Firebase not connected':'⚠ Firebase není připojen'; return; }
-    if(st) st.textContent = curLang==='en'?'⏳ Saving...':'⏳ Ukládám...';
-    window.dbPush(window.dbRef(window.db, 'hardwareDb/images'), url)
-      .then(() => {
-        if(st) st.textContent = curLang==='en'?'✅ Added':'✅ Přidáno';
-        if(inp) inp.value = '';
-        // Znovu načíst obrázky
-        window.dbGet(window.dbRef(window.db, 'hardwareDb/images')).then(snap => {
-          renderHwImages(snap.exists() ? snap.val() : null);
-        });
-      })
-      .catch(e => { if(st) st.textContent = '❌ Chyba: ' + e.message; });
+    const progress = document.getElementById('hw-img-progress');
+    const bar = document.getElementById('hw-img-bar');
+    const inp = document.getElementById('hw-img-file');
+    if (!window.storageRef || !window.uploadBytesResumable || !window.getDownloadURL || !window.db) {
+      if(st) st.textContent = '⚠ Firebase není připojen'; return;
+    }
+    if (file.size > 50 * 1024 * 1024) { if(st) st.textContent = '❌ Soubor je příliš velký (max 50 MB)'; return; }
+    if(st) st.textContent = '⏳ Nahrávám...';
+    if(progress) progress.style.display = 'block';
+    if(bar) bar.style.width = '0%';
+    const ts = Date.now();
+    const safeName = ts + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const sRef = window.storageRef(window.storage, 'hardware/' + safeName);
+    const task = window.uploadBytesResumable(sRef, file);
+    task.on('state_changed',
+      (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        if(bar) bar.style.width = pct + '%';
+        if(st) st.textContent = '⏳ Nahrávám... ' + pct + '%';
+      },
+      (err) => {
+        if(st) st.textContent = '❌ Chyba: ' + (err.code || err.message);
+        if(progress) progress.style.display = 'none';
+      },
+      async () => {
+        try {
+          const url = await window.getDownloadURL(task.snapshot.ref);
+          await window.dbPush(window.dbRef(window.db, 'hardwareDb/images'), { url: url, path: 'hardware/' + safeName, ts: ts });
+          if(st) st.textContent = '✅ Přidáno';
+          if(progress) progress.style.display = 'none';
+          if(inp) inp.value = '';
+          window.dbGet(window.dbRef(window.db, 'hardwareDb/images')).then(snap => {
+            renderHwImages(snap.exists() ? snap.val() : null);
+          });
+        } catch(e) {
+          if(st) st.textContent = '❌ Chyba: ' + e.message;
+          if(progress) progress.style.display = 'none';
+        }
+      }
+    );
   }
-  function delHwImage(key) {
+  function delHwImage(key, path) {
     if (!window.dbRemove || !window.dbRef || !window.db) return;
     if (!confirm(curLang==='en'?'Delete this image?':'Smazat tento obrázek?')) return;
     window.dbRemove(window.dbRef(window.db, 'hardwareDb/images/' + key))
       .then(() => {
+        if (path && window.storageRef && window.storage) {
+          const sRef = window.storageRef(window.storage, path);
+          window.deleteObject && window.deleteObject(sRef).catch(e => console.warn('Storage delete:', e));
+        }
         window.dbGet(window.dbRef(window.db, 'hardwareDb/images')).then(snap => {
           renderHwImages(snap.exists() ? snap.val() : null);
         });
