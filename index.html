@@ -630,15 +630,9 @@
               window._manualVideoActive = true;
             }
           } catch(e) {}
-          var videosRef = storageRef(storage, 'videos');
-          var result = await listAll(videosRef);
-          var mp4items = result.items.filter(function(item){ return item.name.toLowerCase().endsWith('.mp4'); });
-          console.log('KladyxVideo: nalezeno MP4 ve složce videos/:', mp4items.length);
-          if (mp4items.length === 0) {
-            console.warn('KladyxVideo: ve složce videos/ nejsou žádné .mp4 soubory');
-            return;
-          }
-          _videoList = shuffle(mp4items.slice());
+          var mp4items = ['Kladyxland_detected_loop.mp4'];
+          console.log('KladyxVideo: nalezeno MP4:', mp4items.length);
+          _videoList = mp4items.slice();
           _videoIndex = 0;
           playVideoAt(0);
 
@@ -665,7 +659,7 @@
         if (window._manualVideoActive) return; // ruční URL aktivní - nepřepisuj
         var item = _videoList[idx % _videoList.length];
         try {
-          var url = await getDownloadURL(item);
+          var url = 'https://kladyx.github.io/kladyxland/videos/' + item;
           var v = document.getElementById('main-video');
           if (!v) return;
           v.src = url;
@@ -674,7 +668,7 @@
           v.oncanplay = function() { v.play().catch(function(){}); };
           v.onended = function() { v.currentTime = 0; v.play().catch(function(){}); };
           v.loop = true;
-          console.log('KladyxVideo: přehrávám', item.name);
+          console.log('KladyxVideo: přehrávám', item);
         } catch(e) {
           console.error('KladyxVideo: nelze přehrát', item && item.name, e && e.code, e && e.message);
         }
@@ -3811,7 +3805,7 @@ if (document.readyState === 'loading') {
     }).catch(() => {});
   }, 5000);
 
-  const CURRENT_VERSION = '3.5.6';
+  const CURRENT_VERSION = '3.5.7';
 
   // Auto-login při načtení stránky – zkontroluj localStorage
   window.addEventListener('load', async function() {
