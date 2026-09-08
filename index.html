@@ -827,8 +827,8 @@
       });
     });
 
-    // Cleanup starých presence záznamů (starší než 5 minut)
-    const PRESENCE_TIMEOUT = 5 * 60 * 1000;
+    // Cleanup starých presence záznamů (starší než 10 minut)
+    const PRESENCE_TIMEOUT = 10 * 60 * 1000;
     let serverTimeOffset = 0;
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
       serverTimeOffset = snap.val() || 0;
@@ -845,25 +845,28 @@
           }
         });
       });
-    }, 60 * 1000);
+    }, 10 * 60 * 1000);
 
-    // Obnovit vlastní timestamp každé 2 minuty
+    // Obnovit vlastní timestamp každých 5 minut
     setInterval(() => {
       if (myPresenceRef) {
         set(myPresenceRef, { ts: serverTimestamp() });
       }
-    }, 2 * 60 * 1000);
+    }, 5 * 60 * 1000);
 
-    onValue(presenceRef, (snap) => {
-      let count = 0;
-      if (snap.exists()) snap.forEach(() => { count++; });
-      const el = document.getElementById('vc');
-      if (el) el.textContent = count;
-      const el2 = document.getElementById('vc2');
-      if (el2) el2.textContent = count;
-      console.log('📊 Online návštěvníků:', count);
-    });
-
+    // Počet návštěvníků: get() každých 5 min místo onValue – žádný trvalý listener
+    function refreshPresenceCount() {
+      get(presenceRef).then((snap) => {
+        let count = 0;
+        if (snap.exists()) snap.forEach(() => { count++; });
+        const el = document.getElementById('vc');
+        if (el) el.textContent = count;
+        const el2 = document.getElementById('vc2');
+        if (el2) el2.textContent = count;
+      });
+    }
+    refreshPresenceCount();
+    setInterval(refreshPresenceCount, 5 * 60 * 1000);
     // ── TOTAL VISITORS COUNTER (přičítá +1 při každém načtení) ──────────
     const totalVisRef = ref(db, 'totalVisitors');
     runTransaction(totalVisRef, (current) => (current || 0) + 1)
@@ -3808,7 +3811,7 @@ if (document.readyState === 'loading') {
     }).catch(() => {});
   }, 5000);
 
-  const CURRENT_VERSION = '3.5.5';
+  const CURRENT_VERSION = '3.5.6';
 
   // Auto-login při načtení stránky – zkontroluj localStorage
   window.addEventListener('load', async function() {
