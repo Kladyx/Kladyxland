@@ -1462,18 +1462,7 @@
     const grayscaleRef = ref(db, 'grayscale');
 
     // ── POČTY V DB TLAČÍTKÁCH ───────────────────────────────────────────
-    get(ref(db, 'hardwareDb')).then(snap => {
-      const el = document.getElementById('hw-db-count');
-      if (el) { const n = snap.exists() ? Object.keys(snap.val()).length : 0; el.textContent = n + ' ' + t('polozek'); }
-    }).catch(e => console.warn('hardwareDb:', e));
-    get(ref(db, 'lpRecordsDb')).then(snap => {
-      const el = document.getElementById('lp-db-count');
-      if (el) { const n = snap.exists() ? Object.keys(snap.val()).length : 0; el.textContent = n + ' ' + t('desek'); }
-    }).catch(e => console.warn('lpRecordsDb:', e));
-    get(ref(db, 'cdRecordsDb')).then(snap => {
-      const el = document.getElementById('cd-db-count');
-      if (el) { const n = snap.exists() ? Object.keys(snap.val()).length : 0; el.textContent = n + ' CD'; }
-    }).catch(e => console.warn('cdRecordsDb:', e));
+
     // Načti uložený režim z localStorage (fallback pokud Firebase ještě nenačetl)
     window._grayscaleMode = localStorage.getItem('gs-mode') || 'auto'; // auto | on | off | full
 
@@ -3806,7 +3795,7 @@ if (document.readyState === 'loading') {
     }).catch(() => {});
   }, 5000);
 
-  const CURRENT_VERSION = '3.5.8';
+  const CURRENT_VERSION = '3.5.9';
 
   // Auto-login při načtení stránky – zkontroluj localStorage
   window.addEventListener('load', async function() {
