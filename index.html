@@ -630,7 +630,8 @@
               window._manualVideoActive = true;
             }
           } catch(e) {}
-          var mp4items = ['Kladyxland_detected_loop.mp4'];
+          var resp = await fetch('videos.json');
+          var mp4items = await resp.json();
           console.log('KladyxVideo: nalezeno MP4:', mp4items.length);
           _videoList = mp4items.slice();
           _videoIndex = 0;
@@ -3805,7 +3806,7 @@ if (document.readyState === 'loading') {
     }).catch(() => {});
   }, 5000);
 
-  const CURRENT_VERSION = '3.5.7';
+  const CURRENT_VERSION = '3.5.8';
 
   // Auto-login při načtení stránky – zkontroluj localStorage
   window.addEventListener('load', async function() {
