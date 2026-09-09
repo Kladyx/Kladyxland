@@ -659,7 +659,7 @@
         if (window._manualVideoActive) return; // ruční URL aktivní - nepřepisuj
         var item = _videoList[idx % _videoList.length];
         try {
-          var url = 'https://kladyx.github.io/kladyxland/videos/' + item;
+          var url = 'https://kladyx.github.io/kladyxland/' + item;
           var v = document.getElementById('main-video');
           if (!v) return;
           v.src = url;
